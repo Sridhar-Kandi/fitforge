@@ -36,27 +36,35 @@
 :root { --r: 16px; --rs: 10px; --nav-h: 68px; }
 
 * { margin:0; padding:0; box-sizing:border-box; }
-html { font-size:15px; -webkit-tap-highlight-color:transparent; scroll-behavior:smooth; }
+html { font-size:15px; -webkit-tap-highlight-color:transparent; scroll-behavior:smooth; overflow-y:scroll; }
 body {
   font-family: 'Poppins', sans-serif;
   background: var(--bg); color: var(--text);
   min-height:100dvh; overflow-x:hidden;
   padding-bottom: calc(var(--nav-h) + 28px);
   -webkit-font-smoothing:antialiased; transition: background .3s, color .3s;
+  /* Subtle texture so scrolling doesn't look flat */
+  background-image: radial-gradient(circle at 50% 0%, var(--surface) 0%, transparent 60%);
+  background-attachment: fixed;
+  background-size: 100% 400px;
+  background-repeat: no-repeat;
 }
 input,textarea,select,button { font-family:inherit; font-size:inherit; }
 button { cursor:pointer; border:none; background:none; color:inherit; }
 a { color:var(--blue); text-decoration:none; }
-::-webkit-scrollbar { width:4px; }
-::-webkit-scrollbar-track { background:transparent; }
-::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-track { background:var(--bg); }
+::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:var(--text3); }
+/* Firefox scrollbar */
+* { scrollbar-width:thin; scrollbar-color:var(--border2) var(--bg); }
 @keyframes pulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.12);} }
 @keyframes fadeIn { from{opacity:0;transform:translateY(8px);} to{opacity:1;transform:translateY(0);} }
 @keyframes slideUp { from{transform:translateY(100%);} to{transform:translateY(0);} }
 
 /* ── App Shell ── */
-.app { max-width:640px; margin:0 auto; padding:0 20px; }
-.page { display:none; padding:20px 0 24px; animation:fadeIn .3s ease; }
+.app { max-width:640px; margin:0 auto; padding:0 20px; position:relative; }
+.page { display:none; padding:20px 0 24px; animation:fadeIn .3s ease; min-height:calc(100dvh - var(--nav-h) - 48px); }
 .page.active { display:block; }
 
 /* ── Bottom Nav ── */
@@ -83,8 +91,9 @@ a { color:var(--blue); text-decoration:none; }
 .card {
   background:var(--surface); border:1px solid var(--border);
   border-radius:var(--r); padding:18px; margin-bottom:14px;
-  box-shadow:var(--card-shadow); transition: background .3s, border .3s, box-shadow .3s;
+  box-shadow:var(--card-shadow); transition: background .3s, border .3s, box-shadow .3s, transform .15s;
 }
+.card:active { transform:scale(0.99); }
 
 /* ── Typography ── */
 .section-title { font-weight:800; font-size:1.55rem; letter-spacing:-0.02em; margin-bottom:18px; }

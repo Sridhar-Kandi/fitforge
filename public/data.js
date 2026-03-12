@@ -3,7 +3,7 @@
 // 6-day PPL x2 | No RDL | No cardio on leg days
 // ═══════════════════════════════════════════════════
 
-const PLAN_START = new Date(2026, 2, 10);
+const PLAN_START = new Date(2026, 2, 11); // March 11 — first training day (Legs A)
 
 // ─── WARM-UP ───
 const WARMUP = [
@@ -64,9 +64,10 @@ const CARDIO_PROGRESSIVE = {
 };
 
 // ─── 6-DAY PPL SPLIT ───
-// Push A (Tue), Pull A (Wed), Legs A (Thu), Push B (Fri), Pull B (Sat), Legs B (Sun), Rest (Mon)
-// NO RDL anywhere — replaced with cable pull-through, stability ball curl, trap bar deadlift alternatives
-// NO cardio on leg days — extra plank/core work instead
+// Legs A (Wed), Push A (Thu), Pull A (Fri), Legs B (Sat), Push B (Sun), Pull B (Mon), Rest (Tue)
+// Started March 11 (Wed) with Legs A
+// NO RDL — replaced with cable pull-through, stability ball curl, trap bar deadlift
+// NO cardio on leg days — extra plank/core instead
 
 const EXERCISES = {
   push_a: [
@@ -138,11 +139,12 @@ const WORKOUT_LABELS = {
   legs_b:{label:"Legs B",sub:"Hamstring & Glute + Core",icon:"\u{1F525}",color:"#f59e42"},
 };
 
-// Tue=2(PushA), Wed=3(PullA), Thu=4(LegsA), Fri=5(PushB), Sat=6(PullB), Sun=0(LegsB), Mon=1(Rest)
-const WORKOUT_MAP = {2:'push_a',3:'pull_a',4:'legs_a',5:'push_b',6:'pull_b',0:'legs_b'};
+// Schedule: Wed=LegsA, Thu=PushA, Fri=PullA, Sat=LegsB, Sun=PushB, Mon=PullB, Tue=Rest
+// Matches: You did Legs on Wed Mar 11 → Legs-Push-Pull-Legs-Push-Pull-Rest
+const WORKOUT_MAP = {3:'legs_a',4:'push_a',5:'pull_a',6:'legs_b',0:'push_b',1:'pull_b'};
 
 const REST_DAYS = {
-  1:{label:"Full Rest & Recovery",icon:"\u{1F634}",color:"#34d399",type:"rest",
+  2:{label:"Full Rest & Recovery",icon:"\u{1F634}",color:"#34d399",type:"rest",
     activities:["No structured exercise. Light walking fine.","Hit protein target: 140-160g (eggetarian sources)","Stay hydrated: 2.5-3L water","Foam roll tight areas: quads, glutes, upper back","7-9 hours sleep — growth hormone peaks during deep sleep","Optional: gentle cervical nods + thoracic rotation if stiff"]}
 };
 
