@@ -3,7 +3,7 @@
 // 6-day PPL x2 | No RDL | No cardio on leg days
 // ═══════════════════════════════════════════════════
 
-const PLAN_START = new Date(2026, 2, 11); // March 11 — first training day (Legs A)
+const PLAN_START = new Date(2026, 2, 10); // March 10 — first training day (Push A / Chest)
 
 // ─── WARM-UP ───
 const WARMUP = [
@@ -64,8 +64,8 @@ const CARDIO_PROGRESSIVE = {
 };
 
 // ─── 6-DAY PPL SPLIT ───
-// Legs A (Wed), Push A (Thu), Pull A (Fri), Legs B (Sat), Push B (Sun), Pull B (Mon), Rest (Tue)
-// Started March 11 (Wed) with Legs A
+// Push A (Tue), Legs A (Wed), Pull A (Thu), Push B (Fri), Legs B (Sat), Pull B (Sun), Rest (Mon)
+// Started March 10 (Tue) with Push A (Chest)
 // NO RDL — replaced with cable pull-through, stability ball curl, trap bar deadlift
 // NO cardio on leg days — extra plank/core instead
 
@@ -139,12 +139,12 @@ const WORKOUT_LABELS = {
   legs_b:{label:"Legs B",sub:"Hamstring & Glute + Core",icon:"\u{1F525}",color:"#f59e42"},
 };
 
-// Schedule: Wed=LegsA, Thu=PushA, Fri=PullA, Sat=LegsB, Sun=PushB, Mon=PullB, Tue=Rest
-// Matches: You did Legs on Wed Mar 11 → Legs-Push-Pull-Legs-Push-Pull-Rest
-const WORKOUT_MAP = {3:'legs_a',4:'push_a',5:'pull_a',6:'legs_b',0:'push_b',1:'pull_b'};
+// Schedule: Tue=PushA, Wed=LegsA, Thu=PullA, Fri=PushB, Sat=LegsB, Sun=PullB, Mon=Rest
+// You did: Tue Mar 10 = Chest (Push A), Wed Mar 11 = Legs (Legs A), Thu Mar 12 = Back (Pull A)
+const WORKOUT_MAP = {2:'push_a',3:'legs_a',4:'pull_a',5:'push_b',6:'legs_b',0:'pull_b'};
 
 const REST_DAYS = {
-  2:{label:"Full Rest & Recovery",icon:"\u{1F634}",color:"#34d399",type:"rest",
+  1:{label:"Full Rest & Recovery",icon:"\u{1F634}",color:"#34d399",type:"rest",
     activities:["No structured exercise. Light walking fine.","Hit protein target: 140-160g (eggetarian sources)","Stay hydrated: 2.5-3L water","Foam roll tight areas: quads, glutes, upper back","7-9 hours sleep — growth hormone peaks during deep sleep","Optional: gentle cervical nods + thoracic rotation if stiff"]}
 };
 
