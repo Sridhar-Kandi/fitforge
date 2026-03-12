@@ -282,5 +282,83 @@ textarea.input { resize:vertical; min-height:60px; }
 .hidden-input{position:absolute;opacity:0;width:0;height:0;pointer-events:none;}
 .del-btn{color:var(--text3);padding:4px;transition:color .15s;} .del-btn:hover{color:var(--red);}
 
+/* ── Per-Set Checkboxes ── */
+.ex-card { margin-bottom:10px; transition:all .2s; }
+.sets-row {
+  display:flex; gap:8px; flex-wrap:wrap;
+}
+.set-item {
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  cursor:pointer; padding:6px 4px; border-radius:10px; transition:all .15s;
+  min-width:48px;
+}
+.set-item:active { transform:scale(0.9); }
+.set-item.set-next { animation:pulseGlow 2s infinite; }
+@keyframes pulseGlow { 0%,100%{box-shadow:none;} 50%{box-shadow:0 0 12px var(--blue-g);} }
+.set-check {
+  width:36px; height:36px; border-radius:10px; border:2px solid var(--border2);
+  display:flex; align-items:center; justify-content:center;
+  transition:all .2s; background:var(--bg2);
+}
+.set-check svg { width:16px; height:16px; }
+.set-check.checked { background:var(--green); border-color:var(--green); }
+.set-num { font-size:0.8rem; font-weight:700; color:var(--text3); }
+.set-done .set-num { color:var(--green); }
+.set-next .set-check { border-color:var(--blue); }
+.set-next .set-num { color:var(--blue); }
+.set-label { font-size:0.6rem; font-weight:600; color:var(--text3); }
+
+/* ── Rest Timer ── */
+.timer-container {
+  position:fixed; bottom:calc(var(--nav-h) + 8px); left:50%; transform:translateX(-50%);
+  z-index:150; width:calc(100% - 32px); max-width:400px;
+  animation:slideUp .3s cubic-bezier(0.16,1,0.3,1);
+}
+.timer-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:20px; padding:20px; text-align:center;
+  box-shadow:0 -4px 30px rgba(0,0,0,0.4);
+  backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+}
+.timer-header {
+  display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;
+}
+.timer-ex-name {
+  font-weight:700; font-size:0.85rem; color:var(--text2);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:80%;
+}
+.timer-close { color:var(--text3); padding:4px; transition:color .15s; }
+.timer-close:hover { color:var(--red); }
+.timer-ring-wrap {
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  margin:4px auto 14px;
+}
+.timer-ring-svg { display:block; }
+.timer-center {
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+}
+.timer-display {
+  font-size:2.2rem; font-weight:800; letter-spacing:-0.02em;
+  transition:color .3s;
+}
+.timer-status {
+  font-size:0.72rem; font-weight:600; color:var(--text2); margin-top:2px;
+  transition:color .3s;
+}
+.timer-controls {
+  display:flex; justify-content:center; gap:12px;
+}
+.timer-adj {
+  min-width:72px; font-weight:700; font-size:0.85rem;
+}
+.timer-btn { color:var(--blue); border-color:var(--blue)30; }
+.timer-btn:hover { background:var(--blue-g); }
+
+/* Timer pulse animation when finishing */
+@keyframes timerPulse {
+  0%,100%{transform:scale(1);} 50%{transform:scale(1.05);}
+}
+
 @media(max-width:380px){ html{font-size:14px;} .nav-btn span{font-size:0.55rem;} }
 @media(min-width:641px){ .app{padding:0 24px;} }

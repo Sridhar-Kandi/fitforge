@@ -34,7 +34,10 @@ function renderToday(){
   const td=new Date(),di=getDayInfo(td),d=tdk(),log=S.workoutLog[d]||{},foods=S.foodLog[d]||[];
   const tc=foods.reduce((s,f)=>s+(f.calories||0),0),tp=foods.reduce((s,f)=>s+(f.protein||0),0);
   let ti=0,done=0;
-  if(di?.type==='workout'){ti=di.exercises.length+WARMUP.length+COOLDOWN.length+(di.isLegDay?0:1);done=(log.warmup?WARMUP.length:0)+Object.values(log.exercises||{}).filter(Boolean).length+(log.cardio&&!di.isLegDay?1:0)+(log.cooldown?COOLDOWN.length:0);}
+  if(di?.type==='workout'){
+    ti=countTotalSets(di.exercises)+WARMUP.length+COOLDOWN.length+(di.isLegDay?0:1);
+    done=(log.warmup?WARMUP.length:0)+countDoneSets(log,di.exercises)+(log.cardio&&!di.isLegDay?1:0)+(log.cooldown?COOLDOWN.length:0);
+  }
   const pct=ti>0?Math.round(done/ti*100):0;
   const gr=td.getHours()<12?'Good morning':td.getHours()<17?'Good afternoon':'Good evening';
   let h=`<div class="page active">`;
@@ -46,7 +49,7 @@ function renderToday(){
     h+=`<div class="card flex gap-8" style="border-left:3px solid ${di.color};padding:14px 16px;"><span style="font-size:1.4rem;">${di.icon}</span><div><div class="fw-700">${di.label}</div><div class="text-xs text-muted">${di.sub}</div></div></div>`;
     h+=buildAcc('\u{1F525} Warm-Up (12-15 min)','wu',bulkList(WARMUP,d,log,'warmup','Warm-Up'),log.warmup);
     h+=`<div class="sub-title mt-12">${di.icon} Main Workout</div>`;
-    di.exercises.forEach(ex=>{const dn=log.exercises?.[ex.name];h+=exRow(ex,dn,d,di.key);});
+    di.exercises.forEach(ex=>{const sd=log.exercises?.[ex.name];h+=exRow(ex,sd,d,di.key);});
     if(!di.isLegDay){const c=getCardio(di.key,di.weekNum);h+=buildAcc(`\u{1F3C3} Cardio \u2014 ${c.name} (${c.duration})`,'cd',cardioBlock(c,d,log),log.cardio);}
     else{h+=`<div class="tip tip-green mt-12"><b>No cardio today (Leg Day).</b> Extra core work is included in the exercises above instead. Your legs need all available recovery for muscle growth.</div>`;}
     h+=buildAcc('\u{1F9CA} Cool-Down & Stretching (10 min)','cd2',bulkList(COOLDOWN,d,log,'cooldown','Stretching'),log.cooldown);
@@ -71,7 +74,7 @@ function renderCalendar(){
   h+=`<div class="flex-between mb-12"><button class="btn btn-sm btn-outline" onclick="calM--;if(calM<0){calM=11;calY--;}render();">\u2039</button><span class="fw-700">${ms[calM]} ${calY}</span><button class="btn btn-sm btn-outline" onclick="calM++;if(calM>11){calM=0;calY++;}render();">\u203A</button></div>`;
   h+=`<div class="mini-cal">`;dns.forEach(d=>{h+=`<div class="mini-cal-day mini-cal-head">${d}</div>`;});
   for(let i=0;i<sd;i++)h+=`<div class="mini-cal-day"></div>`;
-  for(let d=1;d<=dim;d++){const dt=new Date(calY,calM,d),k=dk(dt),isT=k===td,isS=k===dk(selDate),hasL=S.workoutLog[k]&&Object.values(S.workoutLog[k].exercises||{}).filter(Boolean).length>0;
+  for(let d=1;d<=dim;d++){const dt=new Date(calY,calM,d),k=dk(dt),isT=k===td,isS=k===dk(selDate),wl=S.workoutLog[k],hasL=wl&&Object.values(wl.exercises||{}).some(v=>Array.isArray(v)?v.some(Boolean):v===true);
     h+=`<div class="mini-cal-day ${isT?'today':''} ${isS?'selected':''} ${hasL?'has-workout':''}" onclick="selDate=new Date(${calY},${calM},${d});render();">${d}</div>`;}
   h+=`</div>`;
 
@@ -88,7 +91,7 @@ function renderCalendar(){
     h+=buildAcc('\u{1F525} Warm-Up','cwu',bulkList(WARMUP,sd2,sl,'warmup','Warm-Up'),sl.warmup);
     // Exercises
     h+=`<div class="sub-title mt-12">${si.icon} Exercises</div>`;
-    si.exercises.forEach(ex=>{const dn=sl.exercises?.[ex.name];h+=exRow(ex,dn,sd2,si.key);});
+    si.exercises.forEach(ex=>{const sd=sl.exercises?.[ex.name];h+=exRow(ex,sd,sd2,si.key);});
     // Cardio or no-cardio note
     if(!si.isLegDay){const c=getCardio(si.key,si.weekNum);h+=buildAcc(`\u{1F3C3} Cardio \u2014 ${c.name}`,'ccd',cardioBlock(c,sd2,sl),sl.cardio);}
     else{h+=`<div class="tip tip-green mt-12"><b>No cardio on Leg Days.</b> Extra core/plank work is in the exercises above.</div>`;}
@@ -149,9 +152,11 @@ function renderMedical(){
 // ═══════════════════════════════════════
 function renderProgress(){
   const td=new Date();let streak=0;
-  for(let i=0;i<84;i++){const d=new Date(td);d.setDate(d.getDate()-i);const inf=getDayInfo(d);if(inf?.type==='workout'){const l=S.workoutLog[dk(d)];if(l&&Object.values(l.exercises||{}).filter(Boolean).length>0)streak++;else break;}}
-  const tw=Object.keys(S.workoutLog).filter(k=>{const l=S.workoutLog[k];return l&&Object.values(l.exercises||{}).filter(Boolean).length>0;}).length;
-  let te=0;Object.values(S.workoutLog).forEach(l=>{te+=Object.values(l.exercises||{}).filter(Boolean).length;});
+  function _anyDone(l){if(!l?.exercises)return false;return Object.values(l.exercises).some(v=>Array.isArray(v)?v.some(Boolean):v===true);}
+  function _setsDone(l){if(!l?.exercises)return 0;let c=0;Object.values(l.exercises).forEach(v=>{if(Array.isArray(v))c+=v.filter(Boolean).length;else if(v===true)c++;});return c;}
+  for(let i=0;i<84;i++){const d=new Date(td);d.setDate(d.getDate()-i);const inf=getDayInfo(d);if(inf?.type==='workout'){const l=S.workoutLog[dk(d)];if(l&&_anyDone(l))streak++;else break;}}
+  const tw=Object.keys(S.workoutLog).filter(k=>_anyDone(S.workoutLog[k])).length;
+  let te=0;Object.values(S.workoutLog).forEach(l=>{te+=_setsDone(l);});
   let jw=0;for(let i=0;i<7;i++){const d=new Date(td);d.setDate(d.getDate()-i);jw+=(S.foodLog[dk(d)]||[]).filter(f=>f.type==='junk').length;}
   let h=`<div class="page active"><div class="section-title">Progress</div>`;
   h+=`<div class="stat-grid"><div class="stat-card"><div class="stat-val" style="color:var(--green);">\u{1F525} ${streak}</div><div class="stat-label">Streak</div></div><div class="stat-card"><div class="stat-val" style="color:var(--blue);">${tw}</div><div class="stat-label">Sessions</div></div><div class="stat-card"><div class="stat-val" style="color:var(--orange);">${te}</div><div class="stat-label">Exercises</div></div><div class="stat-card"><div class="stat-val" style="color:${jw>3?'var(--red)':'var(--green)'};">${jw}</div><div class="stat-label">Junk/Week</div></div></div>`;
@@ -162,7 +167,7 @@ function renderProgress(){
   h+=`</div>`;
   h+=`<div class="sub-title mt-16">Today's Notes</div><div class="card"><textarea class="input" placeholder="How did you feel? Energy? Pain?..." rows="3" onchange="S.notes[tdk()]=this.value;dbs();">${esc(S.notes[tdk()]||'')}</textarea></div>`;
   h+=`<div class="sub-title mt-16">Last 4 Weeks</div><div class="card" style="padding:12px;">`;
-  for(let w=3;w>=0;w--){h+=`<div class="flex gap-6 mb-8" style="justify-content:center;">`;for(let d=0;d<7;d++){const dt=new Date(td);dt.setDate(dt.getDate()-(w*7+6-d));const k=dk(dt),l=S.workoutLog[k],ed=l?Object.values(l.exercises||{}).filter(Boolean).length:0,inf=getDayInfo(dt),mx=(inf?.exercises)?inf.exercises.length:1,pct=(inf?.type==='workout')?ed/mx:0;const clr=pct>=0.8?'var(--green)':pct>=0.4?'var(--orange)':pct>0?'var(--yellow)':'var(--surface2)';h+=`<div class="heat-cell" style="background:${clr};color:${pct>0?'#fff':'var(--text3)'};">${dt.getDate()}</div>`;}h+=`</div>`;}
+  for(let w=3;w>=0;w--){h+=`<div class="flex gap-6 mb-8" style="justify-content:center;">`;for(let d=0;d<7;d++){const dt=new Date(td);dt.setDate(dt.getDate()-(w*7+6-d));const k=dk(dt),l=S.workoutLog[k],inf=getDayInfo(dt),sd=inf?.exercises?countDoneSets(l,inf.exercises):0,ts=inf?.exercises?countTotalSets(inf.exercises):1,pct=(inf?.type==='workout'&&ts>0)?sd/ts:0;const clr=pct>=0.8?'var(--green)':pct>=0.4?'var(--orange)':pct>0?'var(--yellow)':'var(--surface2)';h+=`<div class="heat-cell" style="background:${clr};color:${pct>0?'#fff':'var(--text3)'};">${dt.getDate()}</div>`;}h+=`</div>`;}
   h+=`<div class="flex gap-8 mt-8" style="justify-content:center;"><span class="text-xs text-dim flex gap-4"><span style="width:10px;height:10px;border-radius:3px;background:var(--green);"></span>80%+</span><span class="text-xs text-dim flex gap-4"><span style="width:10px;height:10px;border-radius:3px;background:var(--orange);"></span>40%+</span><span class="text-xs text-dim flex gap-4"><span style="width:10px;height:10px;border-radius:3px;background:var(--surface2);"></span>None</span></div></div></div>`;
   return h;
 }
@@ -193,8 +198,58 @@ function bulkList(items,dk2,log,field,label){
   items.forEach(it=>{const d=JSON.stringify({name:it.name,sets:it.detail||'',tempo:'\u2014',rest:'\u2014',muscles:it.muscles||'Flexibility',howTo:it.howTo,safety:it.safety||''});h+=`<div class="check-row" style="padding:8px 4px;" onclick='showEx(${d.replace(/'/g,"&#39;")})'><span style="width:6px;height:6px;border-radius:50%;background:var(--orange);flex-shrink:0;"></span><div class="check-info"><div class="check-name" style="font-size:0.82rem;">${it.name}</div><div class="check-detail">${it.detail}</div></div><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="var(--text3)" stroke-width="2"><path stroke-linecap="round" d="M9 18l6-6-6-6"/></svg></div>`;});
   return h;
 }
-function exRow(ex,done,dk2,wkey){
-  return `<div class="check-row" onclick="togEx('${dk2}','${esc(ex.name)}')"><div class="check-box ${done?'checked':''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M5 13l4 4L19 7"/></svg></div><div class="check-info" onclick="event.stopPropagation();showExByName('${esc(ex.name)}','${wkey}')"><div class="check-name ${done?'done':''}">${ex.name}</div><div class="check-detail">${ex.sets} \u00B7 ${ex.tempo} \u00B7 ${ex.rest}</div></div><button class="btn btn-sm btn-outline" style="padding:4px 8px;" onclick="event.stopPropagation();showExByName('${esc(ex.name)}','${wkey}')"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></button></div>`;
+function parseSets(setsStr) {
+  // "4x10-12" → 4, "3x12-15" → 3, "3x30-45s" → 3, "2x8 each" → 2
+  const m = String(setsStr).match(/(\d+)\s*[x×]/i);
+  return m ? parseInt(m[1]) : 3;
+}
+
+function exRow(ex,setsData,dk2,wkey){
+  const numSets = parseSets(ex.sets);
+  const restSec = parseRestTime(ex.rest);
+  // setsData is now an array like [true,true,false,false] or old boolean or undefined
+  let setsDone = [];
+  if (Array.isArray(setsData)) {
+    setsDone = setsData;
+  } else if (setsData === true) {
+    // Migrate old format: all sets done
+    setsDone = Array(numSets).fill(true);
+  } else {
+    setsDone = Array(numSets).fill(false);
+  }
+  const allDone = setsDone.length >= numSets && setsDone.slice(0,numSets).every(Boolean);
+  const doneCnt = setsDone.filter(Boolean).length;
+
+  let h = `<div class="ex-card card" style="padding:14px 16px;${allDone?'border-color:var(--green);opacity:0.85;':''}">`;
+  // Header row
+  h += `<div class="flex-between mb-8">
+    <div class="flex gap-8" style="flex:1;min-width:0;cursor:pointer;" onclick="showExByName('${esc(ex.name)}','${wkey}')">
+      <div style="font-size:0.95rem;${allDone?'text-decoration:line-through;color:var(--text3);':''}" class="fw-700">${ex.name}</div>
+    </div>
+    <div class="flex gap-4">
+      <span class="tag ${allDone?'tag-green':'tag-blue'}" style="font-size:0.65rem;">${doneCnt}/${numSets}</span>
+      <button class="btn btn-sm btn-outline" style="padding:3px 7px;" onclick="showExByName('${esc(ex.name)}','${wkey}')">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      </button>
+    </div>
+  </div>`;
+  // Meta tags
+  h += `<div class="flex gap-6 mb-10 flex-wrap"><span class="tag tag-blue" style="font-size:0.62rem;">${ex.sets}</span><span class="tag tag-purple" style="font-size:0.62rem;">Tempo ${ex.tempo}</span><span class="tag tag-orange" style="font-size:0.62rem;">Rest ${ex.rest}</span></div>`;
+  // Per-set checkboxes
+  h += `<div class="sets-row">`;
+  for (let i = 0; i < numSets; i++) {
+    const isDone = setsDone[i] || false;
+    const isNext = !isDone && (i === 0 || setsDone[i-1]); // first unchecked set after done ones
+    h += `<div class="set-item ${isDone?'set-done':''} ${isNext?'set-next':''}" onclick="togSet('${dk2}','${esc(ex.name)}',${i},${numSets},${restSec})">
+      <div class="set-check ${isDone?'checked':''}">
+        ${isDone ? `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path stroke-linecap="round" d="M5 13l4 4L19 7"/></svg>` : `<span class="set-num">${i+1}</span>`}
+      </div>
+      <div class="set-label">Set ${i+1}</div>
+    </div>`;
+  }
+  h += `</div>`;
+  h += `</div>`;
+  return h;
 }
 function cardioBlock(c,dk2,log){
   let h=`<div class="flex-between mb-10"><div class="flex gap-6"><span class="tag tag-purple">\u23F1 ${c.duration}</span><span class="tag tag-red">\u2665 ${c.hr}</span></div><button class="btn btn-sm ${log.cardio?'btn-green':'btn-primary'}" onclick="togBulk('${dk2}','cardio')">${log.cardio?'\u2713 Done':'Mark Done'}</button></div>`;
@@ -207,7 +262,50 @@ function cardioBlock(c,dk2,log){
 // ═══════════════════════════════════════
 // ACTIONS
 // ═══════════════════════════════════════
-function togEx(dk2,nm){if(!S.workoutLog[dk2])S.workoutLog[dk2]={exercises:{}};if(!S.workoutLog[dk2].exercises)S.workoutLog[dk2].exercises={};S.workoutLog[dk2].exercises[nm]=!S.workoutLog[dk2].exercises[nm];dbs();render();}
+function togSet(dk2,nm,setIdx,numSets,restSec){
+  if(!S.workoutLog[dk2])S.workoutLog[dk2]={exercises:{}};
+  if(!S.workoutLog[dk2].exercises)S.workoutLog[dk2].exercises={};
+  let arr = S.workoutLog[dk2].exercises[nm];
+  // Migrate old boolean format
+  if(!Array.isArray(arr)) arr = Array(numSets).fill(arr===true);
+  // Ensure correct length
+  while(arr.length < numSets) arr.push(false);
+  // Toggle this set
+  arr[setIdx] = !arr[setIdx];
+  S.workoutLog[dk2].exercises[nm] = arr;
+  dbs();
+  render();
+  // If set was just completed (not unchecked) and it's not the last set, auto-start rest timer
+  if(arr[setIdx] && setIdx < numSets - 1){
+    startRestTimer(restSec, nm + ' — Set ' + (setIdx+2) + ' next');
+  }
+}
+// Helper: count completed exercises (all sets done)
+function countDoneExercises(log, exercises){
+  if(!log?.exercises) return 0;
+  let count = 0;
+  exercises.forEach(ex=>{
+    const numSets = parseSets(ex.sets);
+    const arr = log.exercises[ex.name];
+    if(Array.isArray(arr) && arr.slice(0,numSets).every(Boolean)) count++;
+    else if(arr === true) count++;
+  });
+  return count;
+}
+// Helper: count total sets done
+function countDoneSets(log, exercises){
+  if(!log?.exercises) return 0;
+  let count = 0;
+  exercises.forEach(ex=>{
+    const arr = log.exercises[ex.name];
+    if(Array.isArray(arr)) count += arr.filter(Boolean).length;
+    else if(arr === true) count += parseSets(ex.sets);
+  });
+  return count;
+}
+function countTotalSets(exercises){
+  return exercises.reduce((s,ex)=>s+parseSets(ex.sets),0);
+}
 function togBulk(dk2,f){if(!S.workoutLog[dk2])S.workoutLog[dk2]={exercises:{}};S.workoutLog[dk2][f]=!S.workoutLog[dk2][f];dbs();render();}
 function togAcc(id){const b=document.getElementById('bd-'+id),c=document.getElementById('ch-'+id);if(b)b.classList.toggle('open');if(c)c.classList.toggle('open');}
 function showExByName(nm,wk){const ex=EXERCISES[wk]?.find(e=>e.name===nm);if(ex)showEx(ex);}
@@ -225,6 +323,160 @@ function delFood(d,i){if(S.foodLog[d]){S.foodLog[d].splice(i,1);dbs();render();}
 function logW(){const w=parseFloat(document.getElementById('wI')?.value);if(w>0){S.weightLog[tdk()]=w;dbs();render();}}
 function upAv(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{const img=new Image();img.onload=()=>{const c=document.createElement('canvas');c.width=200;c.height=200;const ctx=c.getContext('2d');const m=Math.min(img.width,img.height);ctx.drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,200,200);S.profile.avatarUrl=c.toDataURL('image/jpeg',0.7);dbs();render();};img.src=e.target.result;};r.readAsDataURL(f);}
 function closeM(){document.querySelector('.modal-overlay')?.remove();}
+
+// ═══════════════════════════════════════
+// REST TIMER
+// ═══════════════════════════════════════
+let timerInterval = null;
+let timerRemaining = 0;
+let timerTotal = 0;
+let timerExName = '';
+
+function parseRestTime(restStr) {
+  // Parse "90s", "75s", "60s", "45s" etc.
+  const match = String(restStr).match(/(\d+)/);
+  return match ? parseInt(match[1]) : 60;
+}
+
+function startRestTimer(seconds, exName) {
+  // Stop any existing timer
+  if (timerInterval) clearInterval(timerInterval);
+  timerRemaining = seconds;
+  timerTotal = seconds;
+  timerExName = exName;
+  showTimerUI();
+  timerInterval = setInterval(timerTick, 1000);
+}
+
+function timerTick() {
+  timerRemaining--;
+  if (timerRemaining <= 0) {
+    timerRemaining = 0;
+    clearInterval(timerInterval);
+    timerInterval = null;
+    timerDone();
+  }
+  updateTimerUI();
+}
+
+function timerDone() {
+  // Play notification sound
+  playTimerSound();
+  // Vibrate if supported
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+  // Update UI to show "done" state
+  const display = document.getElementById('timer-display');
+  if (display) {
+    display.style.color = 'var(--green)';
+    display.textContent = 'GO!';
+  }
+  const status = document.getElementById('timer-status');
+  if (status) {
+    status.textContent = 'Rest complete — start your next set!';
+    status.style.color = 'var(--green)';
+  }
+  const ring = document.getElementById('timer-ring-fill');
+  if (ring) ring.style.stroke = 'var(--green)';
+  // Also try browser notification
+  if (Notification.permission === 'granted') {
+    new Notification('FitForge — Rest Done!', { body: 'Start your next set of ' + timerExName, icon: '🔥' });
+  }
+}
+
+function playTimerSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // Three ascending beeps
+    [0, 0.2, 0.4].forEach((delay, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 600 + (i * 200); // 600, 800, 1000 Hz
+      gain.gain.value = 0.3;
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.15);
+    });
+  } catch(e) {}
+}
+
+function adjustTimer(delta) {
+  timerRemaining = Math.max(0, timerRemaining + delta);
+  timerTotal = Math.max(timerTotal, timerRemaining);
+  if (timerRemaining > 0 && !timerInterval) {
+    // Restart if was finished
+    const display = document.getElementById('timer-display');
+    if (display) display.style.color = 'var(--text)';
+    const status = document.getElementById('timer-status');
+    if (status) { status.textContent = 'Resting...'; status.style.color = 'var(--text2)'; }
+    timerInterval = setInterval(timerTick, 1000);
+  }
+  updateTimerUI();
+}
+
+function stopTimer() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  const el = document.getElementById('timer-container');
+  if (el) el.remove();
+}
+
+function showTimerUI() {
+  // Request notification permission on first timer
+  if (Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+  // Remove existing timer UI
+  const existing = document.getElementById('timer-container');
+  if (existing) existing.remove();
+
+  const html = `<div id="timer-container" class="timer-container">
+    <div class="timer-card">
+      <div class="timer-header">
+        <div class="timer-ex-name">${timerExName}</div>
+        <button onclick="stopTimer()" class="timer-close"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="timer-ring-wrap">
+        <svg width="140" height="140" viewBox="0 0 140 140" class="timer-ring-svg">
+          <circle cx="70" cy="70" r="60" fill="none" stroke="var(--surface3)" stroke-width="8"/>
+          <circle id="timer-ring-fill" cx="70" cy="70" r="60" fill="none" stroke="var(--blue)" stroke-width="8" stroke-linecap="round" stroke-dasharray="377" stroke-dashoffset="0" transform="rotate(-90 70 70)" style="transition:stroke-dashoffset 1s linear, stroke .3s;"/>
+        </svg>
+        <div class="timer-center">
+          <div id="timer-display" class="timer-display">${formatTime(timerRemaining)}</div>
+          <div id="timer-status" class="timer-status">Resting...</div>
+        </div>
+      </div>
+      <div class="timer-controls">
+        <button class="btn btn-sm btn-outline timer-adj" onclick="adjustTimer(-15)">-15s</button>
+        <button class="btn btn-sm btn-outline timer-adj" onclick="adjustTimer(15)">+15s</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  updateTimerUI();
+}
+
+function updateTimerUI() {
+  const display = document.getElementById('timer-display');
+  if (display && timerRemaining > 0) display.textContent = formatTime(timerRemaining);
+
+  // Update ring
+  const ring = document.getElementById('timer-ring-fill');
+  if (ring) {
+    const circumference = 2 * Math.PI * 60; // r=60
+    const progress = timerTotal > 0 ? timerRemaining / timerTotal : 0;
+    ring.style.strokeDashoffset = circumference * (1 - progress);
+    if (timerRemaining <= 5 && timerRemaining > 0) {
+      ring.style.stroke = 'var(--red)';
+      display.style.color = 'var(--red)';
+    }
+  }
+}
+
+function formatTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m > 0 ? `${m}:${String(s).padStart(2,'0')}` : `${s}s`;
+}
 
 // ─── INIT ───
 async function init(){
