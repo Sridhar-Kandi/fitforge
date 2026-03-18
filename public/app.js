@@ -325,31 +325,67 @@ function upAv(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.
 function closeM(){document.querySelector('.modal-overlay')?.remove();}
 
 // ═══════════════════════════════════════
-// REST TIMER
+// REST TIMER (iOS Safari + Chrome compatible)
 // ═══════════════════════════════════════
 let timerInterval = null;
 let timerRemaining = 0;
 let timerTotal = 0;
 let timerExName = '';
+let audioCtx = null;      // Reusable AudioContext unlocked on first tap
+let timerWakeLock = null;  // Keep screen awake during timer
 
 function parseRestTime(restStr) {
-  // Parse "90s", "75s", "60s", "45s" etc.
   const match = String(restStr).match(/(\d+)/);
   return match ? parseInt(match[1]) : 60;
 }
 
+// Unlock AudioContext on first user interaction (iOS requirement)
+function unlockAudio() {
+  if (audioCtx) return;
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // iOS needs a silent buffer played on user gesture to unlock
+    const buf = audioCtx.createBuffer(1, 1, 22050);
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(audioCtx.destination);
+    src.start(0);
+  } catch(e) { audioCtx = null; }
+}
+// Attach to first touch/click anywhere
+document.addEventListener('touchstart', unlockAudio, { once: true });
+document.addEventListener('click', unlockAudio, { once: true });
+
 function startRestTimer(seconds, exName) {
-  // Stop any existing timer
+  unlockAudio(); // Ensure audio is ready
   if (timerInterval) clearInterval(timerInterval);
   timerRemaining = seconds;
   timerTotal = seconds;
   timerExName = exName;
   showTimerUI();
   timerInterval = setInterval(timerTick, 1000);
+  // Try to keep screen awake (if supported)
+  requestWakeLock();
+}
+
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      timerWakeLock = await navigator.wakeLock.request('screen');
+    }
+  } catch(e) {}
+}
+
+function releaseWakeLock() {
+  if (timerWakeLock) { timerWakeLock.release().catch(()=>{}); timerWakeLock = null; }
 }
 
 function timerTick() {
   timerRemaining--;
+  if (timerRemaining <= 3 && timerRemaining > 0) {
+    // Tick sound for last 3 seconds
+    playTick();
+  }
   if (timerRemaining <= 0) {
     timerRemaining = 0;
     clearInterval(timerInterval);
@@ -360,42 +396,54 @@ function timerTick() {
 }
 
 function timerDone() {
-  // Play notification sound
   playTimerSound();
-  // Vibrate if supported
-  if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
-  // Update UI to show "done" state
+  // Vibrate pattern (works on Android, some iOS)
+  try { navigator.vibrate([200, 100, 200, 100, 300]); } catch(e) {}
+  releaseWakeLock();
+
   const display = document.getElementById('timer-display');
-  if (display) {
-    display.style.color = 'var(--green)';
-    display.textContent = 'GO!';
-  }
   const status = document.getElementById('timer-status');
-  if (status) {
-    status.textContent = 'Rest complete — start your next set!';
-    status.style.color = 'var(--green)';
-  }
   const ring = document.getElementById('timer-ring-fill');
+  const card = document.getElementById('timer-card-inner');
+
+  if (display) { display.style.color = 'var(--green)'; display.textContent = 'GO!'; }
+  if (status) { status.textContent = 'Start your next set!'; status.style.color = 'var(--green)'; status.style.fontSize = '0.85rem'; }
   if (ring) ring.style.stroke = 'var(--green)';
-  // Also try browser notification
-  if (Notification.permission === 'granted') {
-    new Notification('FitForge — Rest Done!', { body: 'Start your next set of ' + timerExName, icon: '🔥' });
-  }
+  if (card) card.style.borderColor = 'var(--green)';
+}
+
+function playTick() {
+  if (!audioCtx) return;
+  try {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = 880;
+    gain.gain.value = 0.15;
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + 0.08);
+  } catch(e) {}
 }
 
 function playTimerSound() {
+  if (!audioCtx) return;
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    // Three ascending beeps
-    [0, 0.2, 0.4].forEach((delay, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    // Three ascending beeps — louder and longer
+    const times = [0, 0.25, 0.5];
+    const freqs = [660, 880, 1100];
+    times.forEach((t, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
       osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = 600 + (i * 200); // 600, 800, 1000 Hz
-      gain.gain.value = 0.3;
-      osc.start(ctx.currentTime + delay);
-      osc.stop(ctx.currentTime + delay + 0.15);
+      gain.connect(audioCtx.destination);
+      osc.frequency.value = freqs[i];
+      gain.gain.setValueAtTime(0.4, audioCtx.currentTime + t);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + t + 0.3);
+      osc.start(audioCtx.currentTime + t);
+      osc.stop(audioCtx.currentTime + t + 0.3);
     });
   } catch(e) {}
 }
@@ -404,41 +452,41 @@ function adjustTimer(delta) {
   timerRemaining = Math.max(0, timerRemaining + delta);
   timerTotal = Math.max(timerTotal, timerRemaining);
   if (timerRemaining > 0 && !timerInterval) {
-    // Restart if was finished
     const display = document.getElementById('timer-display');
-    if (display) display.style.color = 'var(--text)';
     const status = document.getElementById('timer-status');
-    if (status) { status.textContent = 'Resting...'; status.style.color = 'var(--text2)'; }
+    const ring = document.getElementById('timer-ring-fill');
+    const card = document.getElementById('timer-card-inner');
+    if (display) display.style.color = 'var(--text)';
+    if (status) { status.textContent = 'Resting...'; status.style.color = 'var(--text2)'; status.style.fontSize = ''; }
+    if (ring) ring.style.stroke = 'var(--blue)';
+    if (card) card.style.borderColor = 'var(--border)';
     timerInterval = setInterval(timerTick, 1000);
+    requestWakeLock();
   }
   updateTimerUI();
 }
 
 function stopTimer() {
   if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  releaseWakeLock();
   const el = document.getElementById('timer-container');
   if (el) el.remove();
 }
 
 function showTimerUI() {
-  // Request notification permission on first timer
-  if (Notification.permission === 'default') {
-    Notification.requestPermission();
-  }
-  // Remove existing timer UI
   const existing = document.getElementById('timer-container');
   if (existing) existing.remove();
 
   const html = `<div id="timer-container" class="timer-container">
-    <div class="timer-card">
+    <div class="timer-card" id="timer-card-inner">
       <div class="timer-header">
         <div class="timer-ex-name">${timerExName}</div>
-        <button onclick="stopTimer()" class="timer-close"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M18 6L6 18M6 6l12 12"/></svg></button>
+        <button onclick="stopTimer()" class="timer-close">\u2715</button>
       </div>
       <div class="timer-ring-wrap">
-        <svg width="140" height="140" viewBox="0 0 140 140" class="timer-ring-svg">
-          <circle cx="70" cy="70" r="60" fill="none" stroke="var(--surface3)" stroke-width="8"/>
-          <circle id="timer-ring-fill" cx="70" cy="70" r="60" fill="none" stroke="var(--blue)" stroke-width="8" stroke-linecap="round" stroke-dasharray="377" stroke-dashoffset="0" transform="rotate(-90 70 70)" style="transition:stroke-dashoffset 1s linear, stroke .3s;"/>
+        <svg width="130" height="130" viewBox="0 0 140 140" class="timer-ring-svg">
+          <circle cx="70" cy="70" r="60" fill="none" stroke="var(--surface3)" stroke-width="7"/>
+          <circle id="timer-ring-fill" cx="70" cy="70" r="60" fill="none" stroke="var(--blue)" stroke-width="7" stroke-linecap="round" stroke-dasharray="${2*Math.PI*60}" stroke-dashoffset="0" transform="rotate(-90 70 70)" style="transition:stroke-dashoffset 1s linear, stroke .3s;"/>
         </svg>
         <div class="timer-center">
           <div id="timer-display" class="timer-display">${formatTime(timerRemaining)}</div>
@@ -446,8 +494,8 @@ function showTimerUI() {
         </div>
       </div>
       <div class="timer-controls">
-        <button class="btn btn-sm btn-outline timer-adj" onclick="adjustTimer(-15)">-15s</button>
-        <button class="btn btn-sm btn-outline timer-adj" onclick="adjustTimer(15)">+15s</button>
+        <button class="btn btn-sm btn-outline timer-adj" onclick="adjustTimer(-15)">\u2212 15s</button>
+        <button class="btn btn-sm btn-outline timer-adj" onclick="adjustTimer(15)">+ 15s</button>
       </div>
     </div>
   </div>`;
@@ -459,15 +507,14 @@ function updateTimerUI() {
   const display = document.getElementById('timer-display');
   if (display && timerRemaining > 0) display.textContent = formatTime(timerRemaining);
 
-  // Update ring
   const ring = document.getElementById('timer-ring-fill');
   if (ring) {
-    const circumference = 2 * Math.PI * 60; // r=60
+    const circ = 2 * Math.PI * 60;
     const progress = timerTotal > 0 ? timerRemaining / timerTotal : 0;
-    ring.style.strokeDashoffset = circumference * (1 - progress);
+    ring.style.strokeDashoffset = circ * (1 - progress);
     if (timerRemaining <= 5 && timerRemaining > 0) {
       ring.style.stroke = 'var(--red)';
-      display.style.color = 'var(--red)';
+      if (display) display.style.color = 'var(--red)';
     }
   }
 }
