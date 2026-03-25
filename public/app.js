@@ -35,8 +35,8 @@ function renderToday(){
   const tc=foods.reduce((s,f)=>s+(f.calories||0),0),tp=foods.reduce((s,f)=>s+(f.protein||0),0);
   let ti=0,done=0;
   if(di?.type==='workout'){
-    ti=countTotalSets(di.exercises)+WARMUP.length+COOLDOWN.length+(di.isLegDay?0:1);
-    done=(log.warmup?WARMUP.length:0)+countDoneSets(log,di.exercises)+(log.cardio&&!di.isLegDay?1:0)+(log.cooldown?COOLDOWN.length:0);
+    ti=countTotalSets(di.exercises)+THORACIC_RESET.length+WARMUP.length+COOLDOWN.length+(di.isLegDay?0:1);
+    done=(log.thoracicReset?THORACIC_RESET.length:0)+(log.warmup?WARMUP.length:0)+countDoneSets(log,di.exercises)+(log.cardio&&!di.isLegDay?1:0)+(log.cooldown?COOLDOWN.length:0);
   }
   const pct=ti>0?Math.round(done/ti*100):0;
   const gr=td.getHours()<12?'Good morning':td.getHours()<17?'Good afternoon':'Good evening';
@@ -47,7 +47,8 @@ function renderToday(){
   else if(di.type==='workout'){
     h+=`<div class="tip tip-blue mb-12"><b>${di.phase.name}:</b> ${di.phase.tip}</div>`;
     h+=`<div class="card flex gap-8" style="border-left:3px solid ${di.color};padding:14px 16px;"><span style="font-size:1.4rem;">${di.icon}</span><div><div class="fw-700">${di.label}</div><div class="text-xs text-muted">${di.sub}</div></div></div>`;
-    h+=buildAcc('\u{1F525} Warm-Up (12-15 min)','wu',bulkList(WARMUP,d,log,'warmup','Warm-Up'),log.warmup);
+    h+=buildAcc('\u{1F9D8} Thoracic Reset (5 min) — DO FIRST','tr',bulkList(THORACIC_RESET,d,log,'thoracicReset','Thoracic Reset'),log.thoracicReset);
+    h+=buildAcc('\u{1F525} Warm-Up (10 min)','wu',bulkList(WARMUP,d,log,'warmup','Warm-Up'),log.warmup);
     h+=`<div class="sub-title mt-12">${di.icon} Main Workout</div>`;
     di.exercises.forEach(ex=>{const sd=log.exercises?.[ex.name];h+=exRow(ex,sd,d,di.key);});
     if(!di.isLegDay){const c=getCardio(di.key,di.weekNum);h+=buildAcc(`\u{1F3C3} Cardio \u2014 ${c.name} (${c.duration})`,'cd',cardioBlock(c,d,log),log.cardio);}
@@ -88,6 +89,7 @@ function renderCalendar(){
   else if(si.type==='workout'){
     h+=`<div class="card flex gap-8 mb-12" style="border-left:3px solid ${si.color};padding:14px 16px;"><span style="font-size:1.3rem;">${si.icon}</span><div><div class="fw-700">${si.label}</div><div class="text-xs text-muted">${si.sub} \u00B7 Week ${si.weekNum} \u00B7 ${si.phase.name}</div></div></div>`;
     // Warm-up
+    h+=buildAcc('\u{1F9D8} Thoracic Reset','ctr',bulkList(THORACIC_RESET,sd2,sl,'thoracicReset','Thoracic Reset'),sl.thoracicReset);
     h+=buildAcc('\u{1F525} Warm-Up','cwu',bulkList(WARMUP,sd2,sl,'warmup','Warm-Up'),sl.warmup);
     // Exercises
     h+=`<div class="sub-title mt-12">${si.icon} Exercises</div>`;
@@ -310,7 +312,9 @@ function togBulk(dk2,f){if(!S.workoutLog[dk2])S.workoutLog[dk2]={exercises:{}};S
 function togAcc(id){const b=document.getElementById('bd-'+id),c=document.getElementById('ch-'+id);if(b)b.classList.toggle('open');if(c)c.classList.toggle('open');}
 function showExByName(nm,wk){const ex=EXERCISES[wk]?.find(e=>e.name===nm);if(ex)showEx(ex);}
 function showEx(ex){
-  document.body.insertAdjacentHTML('beforeend',`<div class="modal-overlay" onclick="if(event.target===this)closeM();"><div class="modal"><div class="modal-bar"></div><div class="flex-between mb-12"><h3 style="margin:0;">${ex.name}</h3><button onclick="closeM()" style="padding:6px;"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M18 6L6 18M6 6l12 12"/></svg></button></div><div class="flex gap-6 flex-wrap mb-12"><span class="tag tag-blue">${ex.sets}</span><span class="tag tag-purple">Tempo ${ex.tempo}</span><span class="tag tag-orange">Rest ${ex.rest}</span></div>${ex.muscles?`<div class="ex-detail-section"><h4>\u{1F4AA} Muscles</h4><p>${ex.muscles}</p></div>`:''}<div class="ex-detail-section"><h4>\u{1F4D6} How To Perform</h4><p>${ex.howTo}</p></div>${ex.safety?`<div class="tip tip-red"><b>\u26A0\u{FE0F} Safety:</b> ${ex.safety}</div>`:''}</div></div>`);
+  const howHtml = ex.howTo ? ex.howTo.split('\n').filter(l=>l.trim()).map(l=>`<p style="margin-bottom:10px;">${l}</p>`).join('') : '';
+  const safetyHtml = ex.safety ? ex.safety.split('\n').filter(l=>l.trim()).map(l=>`<p style="margin-bottom:4px;">${l}</p>`).join('') : '';
+  document.body.insertAdjacentHTML('beforeend',`<div class="modal-overlay" onclick="if(event.target===this)closeM();"><div class="modal"><div class="modal-bar"></div><div class="flex-between mb-12"><h3 style="margin:0;">${ex.name}</h3><button onclick="closeM()" style="padding:6px;"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M18 6L6 18M6 6l12 12"/></svg></button></div><div class="flex gap-6 flex-wrap mb-12"><span class="tag tag-blue">${ex.sets}</span><span class="tag tag-purple">Tempo ${ex.tempo}</span><span class="tag tag-orange">Rest ${ex.rest}</span></div>${ex.muscles?`<div class="ex-detail-section"><h4>\u{1F4AA} Target Muscles</h4><p>${ex.muscles}</p></div>`:''}<div class="ex-detail-section"><h4>\u{1F4D6} How To Perform (Your Conditions Considered)</h4>${howHtml}</div>${ex.safety?`<div class="tip tip-red"><b>\u26A0\u{FE0F} Safety for Your Back:</b> ${safetyHtml}</div>`:''}</div></div>`);
 }
 function openFoodModal(){
   const now=new Date().toTimeString().slice(0,5);
